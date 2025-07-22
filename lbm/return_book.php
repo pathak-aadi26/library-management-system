@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['issue_id'])) {
 
     // Insert fine only if there's a delay
     if ($fine > 0) {
-        $insert_fine = "INSERT INTO fines (issue_id, fine_amount, days_late) VALUES ($issue_id, $fine, $days_late)";
+        $insert_fine = "INSERT INTO fines (issue_id, fine_amount, days_late, status, fine_date) VALUES ($issue_id, $fine, $days_late, 'Pending', NOW())";
         mysqli_query($conn, $insert_fine);
     }
 

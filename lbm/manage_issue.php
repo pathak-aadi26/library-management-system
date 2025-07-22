@@ -77,7 +77,7 @@ $result = $conn->query($sql);
         <a href="manage_book.php">Manage Books</a>
         <a href="manage_issue.php">Issued Details</a>
         <a href="#">Borrow Requests</a>
-        <a href="#">Fine Details</a>
+        <a href="fine_details.php">Fine Details</a>
         <a href="#">Returns</a>
         <a href="#">More</a>
         
