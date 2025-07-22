@@ -223,7 +223,7 @@ $total_amount = $conn->query("SELECT SUM(fine_amount) as total FROM fines WHERE 
         <a href="manage_member.php">Manage Member</a>
         <a href="manage_book.php">Manage Books</a>
         <a href="manage_issue.php">Issued Details</a>
-        <a href="#">Borrow Requests</a>
+        <a href="manage_borrow_requests.php">Borrow Requests</a>
         <a href="fine_details.php" style="background: #8ba3f1;">Fine Details</a>
         <a href="manage_returns.php">Returns</a>
         <a href="#">More</a>
