@@ -1,0 +1,168 @@
+<?php
+
+session_start();
+if (!isset($_SESSION['mob_no'])) {
+     
+    header("Location: login.php");
+    exit();
+}
+
+?>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User | Library System</title>
+    <link rel="stylesheet" href="user.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <header>
+        <div class="logo">📚 Library System</div>
+        <div class="user-info">Welcome, User</div>
+    </header>
+
+    <nav>
+        <ul>
+            <li><a href="#">Dashboard</a></li>
+            <li><a href="#">My Loans</a></li>
+            <li><a href="#">Account</a></li>
+            <div class="search-bar">
+              <input type="text" placeholder="Search..." id="searchBar" autocomplete="off" >
+            </div>
+            <button class="logout-btn" onclick="location.href='logout.php'">Logout</button>
+        </ul>
+        
+        
+    </nav>
+
+    <div id="searchResult" style="max-width:700px;margin:20px auto;display:none;background:#fff;padding:15px;border-radius:8px;box-shadow:0 0 10px #aaa;"></div>
+
+    <main>
+
+        <div class="card-con">
+        <section class="card">
+            <h2>My Borrowed Books</h2>
+            <p>You currently have <strong>3</strong> books borrowed.</p>
+        </section>
+
+        <section class="card">
+            <h2>My Borrowed Books</h2>
+            <p>You currently have <strong>3</strong> books borrowed.</p>
+        </section>
+
+        <section class="card">
+            <h2>My Borrowed Books</h2>
+            <p>You currently have <strong>3</strong> books borrowed.</p>
+        </section>
+
+        <section class="card">
+            <h2>Return Reminders</h2>
+            <p>"The Alchemist" is due in <strong>2 days</strong>.</p>
+        </section>
+
+         </div>
+    <section class="table-section">
+      <h2>Borrowed Books</h2>
+
+     <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Search by title, author, or status..." onkeyup="filterTable()">
+     </div>
+      <table id="booksTable">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Borrowed On</th>
+            <th>Due Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>The Alchemist</td>
+            <td>Paulo Coelho</td>
+            <td>2025-07-10</td>
+            <td>2025-07-22</td>
+            <td class="status due-soon">Due Soon</td>
+          </tr>
+          <tr>
+            <td>1984</td>
+            <td>George Orwell</td>
+            <td>2025-07-01</td>
+            <td>2025-07-20</td>
+            <td class="status overdue">Overdue</td>
+          </tr>
+          <tr>
+            <td>Clean Code</td>
+            <td>Robert C. Martin</td>
+            <td>2025-07-05</td>
+            <td>2025-07-25</td>
+            <td class="status on-time">On Time</td>
+          </tr>
+        </tbody>
+      </table>
+</section>
+
+       
+    </main>
+    <script src="sc.js"></script>
+</body>
+</html>
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User | Library System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="logo">📚 Library System</div>
+        <div class="user-info">Welcome, <?php echo htmlspecialchars($username); ?></div>
+    </header>
+
+    <nav>
+        <ul>
+            <li><a href="#">Dashboard</a></li>
+            <li><a href="#">Search Books</a></li>
+            <li><a href="#">My Loans</a></li>
+            <li><a href="#">Account</a></li>
+            <li><a href="logout.php">Logout</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <section class="card">
+            <h2>My Borrowed Books</h2>
+            <p>You currently have <strong>3</strong> books borrowed.</p>
+        </section>
+        
+        <section class="card">
+            <h2>Return Reminders</h2>
+            <p>"The Alchemist" is due in <strong>2 days</strong>.</p>
+        </section>
+    </main>
+</body>
+</html> -->
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Page</title>
+    <link rel="stylesheet" href="user.css">
+</head>
+<body>
+    <div class="box">
+        <h1>Welcome,<span><?=$_SESSION['name']; ?></span></h1>
+        <p>This is an<span>User</span> page</p>
+        <button onclick="Window.location.href='logout.php'>Logout</button>
+    </div>
+</body>
+</html> -->
