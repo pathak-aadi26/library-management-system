@@ -26,7 +26,7 @@ if (!isset($_SESSION['mob_no'])) {
       <a href="manage_issue.php">Issued Details</a>
       <a href="#">Borrow Requests</a>
               <a href="fine_details.php">Fine Details</a>
-      <a href="#">Returns</a>
+              <a href="manage_returns.php">Returns</a>
       <a href="#">More</a>
     </nav>
     <button class="logout-btn" onclick="location.href='logout.php'">Logout</button>

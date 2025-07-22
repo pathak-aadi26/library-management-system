@@ -78,7 +78,7 @@ $result = $conn->query($sql);
         <a href="manage_issue.php">Issued Details</a>
         <a href="#">Borrow Requests</a>
         <a href="fine_details.php">Fine Details</a>
-        <a href="#">Returns</a>
+        <a href="manage_returns.php">Returns</a>
         <a href="#">More</a>
         
     </nav>
