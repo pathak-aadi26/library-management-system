@@ -1,0 +1,256 @@
+//@version=5
+strategy("NIFTY 50 Advanced Perfect Strategy", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=15, pyramiding=1)
+
+// ==================== INPUT PARAMETERS ====================
+// Basic Parameters
+lookback = input.int(14, "Lookback Period", minval=1)
+rsi_length = input.int(14, "RSI Length", minval=1)
+rsi_ob = input.int(70, "RSI Overbought", minval=50, maxval=100)
+rsi_os = input.int(30, "RSI Oversold", minval=0, maxval=50)
+
+// Moving Averages
+ema_fast = input.int(8, "Fast EMA", minval=1)
+ema_slow = input.int(21, "Slow EMA", minval=1)
+sma_filter = input.int(50, "Trend Filter SMA", minval=1)
+ema_long = input.int(200, "Long Term EMA", minval=1)
+
+// MACD Parameters
+macd_fast = input.int(12, "MACD Fast", minval=1)
+macd_slow = input.int(26, "MACD Slow", minval=1)
+macd_signal = input.int(9, "MACD Signal", minval=1)
+
+// Volume Parameters
+vol_length = input.int(20, "Volume MA Length", minval=1)
+vol_multiplier = input.float(1.8, "Volume Multiplier", minval=1.0)
+
+// Money Flow Index
+mfi_length = input.int(14, "MFI Length", minval=1)
+mfi_ob = input.int(80, "MFI Overbought", minval=50)
+mfi_os = input.int(20, "MFI Oversold", minval=0, maxval=50)
+
+// Bollinger Bands
+bb_length = input.int(20, "BB Length", minval=1)
+bb_mult = input.float(2.0, "BB Multiplier", minval=0.1)
+
+// Risk Management
+atr_length = input.int(14, "ATR Length", minval=1)
+sl_multiplier = input.float(1.5, "Stop Loss ATR Multiplier", minval=0.5)
+tp_multiplier = input.float(3.0, "Take Profit ATR Multiplier", minval=1.0)
+
+// Divergence Detection
+div_lookback = input.int(5, "Divergence Lookback", minval=3)
+
+// ==================== TECHNICAL INDICATORS ====================
+// Basic Indicators
+rsi = ta.rsi(close, rsi_length)
+ema_f = ta.ema(close, ema_fast)
+ema_s = ta.ema(close, ema_slow)
+sma_filter_line = ta.sma(close, sma_filter)
+ema_200 = ta.ema(close, ema_long)
+
+// MACD
+[macd_line, signal_line, histogram] = ta.macd(close, macd_fast, macd_slow, macd_signal)
+
+// Volume
+vol_ma = ta.sma(volume, vol_length)
+volume_spike = volume > (vol_ma * vol_multiplier)
+
+// Money Flow Index
+mfi = ta.mfi(hlc3, volume, mfi_length)
+
+// Bollinger Bands
+[bb_upper, bb_middle, bb_lower] = ta.bb(close, bb_length, bb_mult)
+bb_width = (bb_upper - bb_lower) / bb_middle * 100
+
+// ATR
+atr = ta.atr(atr_length)
+
+// Stochastic
+stoch_k = ta.stoch(close, high, low, lookback)
+stoch_d = ta.sma(stoch_k, 3)
+
+// Williams %R
+williams_r = ta.wpr(lookback)
+
+// ADX (Average Directional Index)
+[di_plus, di_minus, adx] = ta.dmi(lookback, lookback)
+
+// Commodity Channel Index
+cci = ta.cci(hlc3, lookback)
+
+// Parabolic SAR
+sar = ta.sar(0.02, 0.02, 0.2)
+
+// Price Action Patterns
+doji = math.abs(close - open) <= (high - low) * 0.1
+hammer = (close > open) and ((high - close) / (close - open) >= 2) and ((open - low) / (close - open) >= 2)
+shooting_star = (open > close) and ((high - open) / (open - close) >= 2) and ((close - low) / (open - close) >= 2)
+
+// Support and Resistance
+pivot_high = ta.pivothigh(high, div_lookback, div_lookback)
+pivot_low = ta.pivotlow(low, div_lookback, div_lookback)
+
+// ==================== DIVERGENCE DETECTION ====================
+// Bullish Divergence (Price makes lower low, indicator makes higher low)
+price_ll = low < ta.valuewhen(pivot_low, low, 1) and pivot_low
+rsi_hl = rsi > ta.valuewhen(pivot_low, rsi, 0) and pivot_low
+macd_hl = macd_line > ta.valuewhen(pivot_low, macd_line, 0) and pivot_low
+
+bullish_div = price_ll and (rsi_hl or macd_hl)
+
+// Bearish Divergence (Price makes higher high, indicator makes lower high)
+price_hh = high > ta.valuewhen(pivot_high, high, 1) and pivot_high
+rsi_lh = rsi < ta.valuewhen(pivot_high, rsi, 0) and pivot_high
+macd_lh = macd_line < ta.valuewhen(pivot_high, macd_line, 0) and pivot_high
+
+bearish_div = price_hh and (rsi_lh or macd_lh)
+
+// ==================== TREND ANALYSIS ====================
+// Multi-timeframe trend
+strong_uptrend = ema_f > ema_s and ema_s > sma_filter_line and close > ema_200 and adx > 25
+strong_downtrend = ema_f < ema_s and ema_s < sma_filter_line and close < ema_200 and adx > 25
+sideways = adx < 25
+
+// Momentum confirmation
+bullish_momentum = rsi > 50 and macd_line > signal_line and stoch_k > stoch_d and cci > 0
+bearish_momentum = rsi < 50 and macd_line < signal_line and stoch_k < stoch_d and cci < 0
+
+// Volume confirmation
+volume_confirm = volume_spike and volume > volume[1]
+
+// ==================== ENTRY CONDITIONS ====================
+// Long Entry Signals
+long_signal_1 = strong_uptrend and bullish_momentum and volume_confirm
+long_signal_2 = close > ema_f and ta.crossover(ema_f, ema_s) and volume_confirm
+long_signal_3 = bullish_div and rsi < 50 and volume_confirm
+long_signal_4 = ta.crossover(close, bb_lower) and rsi < rsi_os and mfi < mfi_os and volume_confirm
+long_signal_5 = hammer and close > ema_f and volume_confirm
+long_signal_6 = ta.crossover(macd_line, signal_line) and macd_line < 0 and close > sar and volume_confirm
+long_signal_7 = williams_r < -80 and ta.crossover(williams_r, williams_r[1]) and strong_uptrend
+
+long_entry = (long_signal_1 or long_signal_2 or long_signal_3 or long_signal_4 or long_signal_5 or long_signal_6 or long_signal_7) and not sideways
+
+// Short Entry Signals
+short_signal_1 = strong_downtrend and bearish_momentum and volume_confirm
+short_signal_2 = close < ema_f and ta.crossunder(ema_f, ema_s) and volume_confirm
+short_signal_3 = bearish_div and rsi > 50 and volume_confirm
+short_signal_4 = ta.crossunder(close, bb_upper) and rsi > rsi_ob and mfi > mfi_ob and volume_confirm
+short_signal_5 = shooting_star and close < ema_f and volume_confirm
+short_signal_6 = ta.crossunder(macd_line, signal_line) and macd_line > 0 and close < sar and volume_confirm
+short_signal_7 = williams_r > -20 and ta.crossunder(williams_r, williams_r[1]) and strong_downtrend
+
+short_entry = (short_signal_1 or short_signal_2 or short_signal_3 or short_signal_4 or short_signal_5 or short_signal_6 or short_signal_7) and not sideways
+
+// ==================== EXIT CONDITIONS ====================
+// Long Exit Conditions
+long_exit_tp = rsi > rsi_ob or close > bb_upper or mfi > mfi_ob or williams_r > -20
+long_exit_sl = close < ema_s or ta.crossunder(macd_line, signal_line) or rsi < 25 or close < sar
+
+// Short Exit Conditions
+short_exit_tp = rsi < rsi_os or close < bb_lower or mfi < mfi_os or williams_r < -80
+short_exit_sl = close > ema_s or ta.crossover(macd_line, signal_line) or rsi > 75 or close > sar
+
+// ==================== STRATEGY EXECUTION ====================
+// Long trades
+if long_entry and strategy.position_size == 0
+    stop_loss_long = close - (atr * sl_multiplier)
+    take_profit_long = close + (atr * tp_multiplier)
+    strategy.entry("Long", strategy.long, comment="Long Entry")
+    strategy.exit("Long TP/SL", "Long", stop=stop_loss_long, limit=take_profit_long)
+
+// Short trades
+if short_entry and strategy.position_size == 0
+    stop_loss_short = close + (atr * sl_multiplier)
+    take_profit_short = close - (atr * tp_multiplier)
+    strategy.entry("Short", strategy.short, comment="Short Entry")
+    strategy.exit("Short TP/SL", "Short", stop=stop_loss_short, limit=take_profit_short)
+
+// Manual exits
+if strategy.position_size > 0 and long_exit_tp
+    strategy.close("Long", comment="Long TP")
+if strategy.position_size > 0 and long_exit_sl
+    strategy.close("Long", comment="Long SL")
+if strategy.position_size < 0 and short_exit_tp
+    strategy.close("Short", comment="Short TP")
+if strategy.position_size < 0 and short_exit_sl
+    strategy.close("Short", comment="Short SL")
+
+// ==================== PLOTTING ====================
+// Moving Averages
+plot(ema_f, color=color.blue, linewidth=2, title="Fast EMA")
+plot(ema_s, color=color.red, linewidth=2, title="Slow EMA")
+plot(sma_filter_line, color=color.orange, linewidth=2, title="Filter SMA")
+plot(ema_200, color=color.purple, linewidth=3, title="EMA 200")
+
+// Bollinger Bands
+p1 = plot(bb_upper, color=color.gray, title="BB Upper")
+p2 = plot(bb_lower, color=color.gray, title="BB Lower")
+fill(p1, p2, color=color.new(color.gray, 95), title="BB Fill")
+
+// SAR
+plot(sar, color=close > sar ? color.lime : color.red, style=plot.style_circles, linewidth=1, title="SAR")
+
+// Entry Signals
+plotshape(long_entry, style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.normal, title="Long Signal")
+plotshape(short_entry, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.normal, title="Short Signal")
+
+// Divergences
+plotshape(bullish_div, style=shape.labelup, location=location.belowbar, color=color.green, text="Bull Div", textcolor=color.white, size=size.small)
+plotshape(bearish_div, style=shape.labeldown, location=location.abovebar, color=color.red, text="Bear Div", textcolor=color.white, size=size.small)
+
+// Background colors for trend
+bgcolor(strong_uptrend ? color.new(color.green, 97) : strong_downtrend ? color.new(color.red, 97) : color.new(color.yellow, 98))
+
+// ==================== INFORMATION PANEL ====================
+var table info_panel = table.new(position.top_right, 2, 12, bgcolor=color.white, border_width=1)
+
+if barstate.islast
+    table.cell(info_panel, 0, 0, "Indicator", bgcolor=color.gray, text_color=color.white)
+    table.cell(info_panel, 1, 0, "Value", bgcolor=color.gray, text_color=color.white)
+    
+    table.cell(info_panel, 0, 1, "RSI", text_color=color.black)
+    table.cell(info_panel, 1, 1, str.tostring(math.round(rsi, 2)), text_color=rsi > rsi_ob ? color.red : rsi < rsi_os ? color.green : color.black)
+    
+    table.cell(info_panel, 0, 2, "MFI", text_color=color.black)
+    table.cell(info_panel, 1, 2, str.tostring(math.round(mfi, 2)), text_color=mfi > mfi_ob ? color.red : mfi < mfi_os ? color.green : color.black)
+    
+    table.cell(info_panel, 0, 3, "MACD", text_color=color.black)
+    table.cell(info_panel, 1, 3, str.tostring(math.round(macd_line, 4)), text_color=macd_line > signal_line ? color.green : color.red)
+    
+    table.cell(info_panel, 0, 4, "ADX", text_color=color.black)
+    table.cell(info_panel, 1, 4, str.tostring(math.round(adx, 2)), text_color=adx > 25 ? color.green : color.orange)
+    
+    table.cell(info_panel, 0, 5, "Volume", text_color=color.black)
+    table.cell(info_panel, 1, 5, volume_spike ? "HIGH" : "NORMAL", text_color=volume_spike ? color.green : color.gray)
+    
+    table.cell(info_panel, 0, 6, "Trend", text_color=color.black)
+    trend_text = strong_uptrend ? "STRONG UP" : strong_downtrend ? "STRONG DOWN" : "SIDEWAYS"
+    trend_color = strong_uptrend ? color.green : strong_downtrend ? color.red : color.orange
+    table.cell(info_panel, 1, 6, trend_text, text_color=trend_color)
+    
+    table.cell(info_panel, 0, 7, "Position", text_color=color.black)
+    pos_text = strategy.position_size > 0 ? "LONG" : strategy.position_size < 0 ? "SHORT" : "NONE"
+    pos_color = strategy.position_size > 0 ? color.green : strategy.position_size < 0 ? color.red : color.gray
+    table.cell(info_panel, 1, 7, pos_text, text_color=pos_color)
+    
+    table.cell(info_panel, 0, 8, "P&L", text_color=color.black)
+    table.cell(info_panel, 1, 8, str.tostring(math.round(strategy.netprofit, 2)), 
+               text_color=strategy.netprofit > 0 ? color.green : strategy.netprofit < 0 ? color.red : color.gray)
+    
+    table.cell(info_panel, 0, 9, "Win Rate", text_color=color.black)
+    win_rate = strategy.closedtrades > 0 ? strategy.wintrades / strategy.closedtrades * 100 : 0
+    table.cell(info_panel, 1, 9, str.tostring(math.round(win_rate, 1)) + "%", text_color=color.black)
+    
+    table.cell(info_panel, 0, 10, "Trades", text_color=color.black)
+    table.cell(info_panel, 1, 10, str.tostring(strategy.closedtrades), text_color=color.black)
+    
+    table.cell(info_panel, 0, 11, "Drawdown", text_color=color.black)
+    table.cell(info_panel, 1, 11, str.tostring(math.round(strategy.max_drawdown, 2)), text_color=color.red)
+
+// ==================== ALERTS ====================
+alertcondition(long_entry, title="NIFTY Long Entry", message="NIFTY 50 Long Entry Signal - Multiple confirmations")
+alertcondition(short_entry, title="NIFTY Short Entry", message="NIFTY 50 Short Entry Signal - Multiple confirmations")
+alertcondition(bullish_div, title="Bullish Divergence", message="NIFTY 50 Bullish Divergence Detected")
+alertcondition(bearish_div, title="Bearish Divergence", message="NIFTY 50 Bearish Divergence Detected")
+alertcondition(long_exit_tp or long_exit_sl, title="Long Exit", message="NIFTY 50 Long Position Exit")
+alertcondition(short_exit_tp or short_exit_sl, title="Short Exit", message="NIFTY 50 Short Position Exit")
