@@ -24,11 +24,7 @@ $member_result = $member_query->get_result();
 $member_data = $member_result->fetch_assoc();
 $member_id = $member_data['member_id'] ?? 0;
 
-// Redirect admin users to admin interface
-if ($member_data['role'] === 'admin') {
-    header('Location: manage_borrow_requests.php');
-    exit;
-}
+// Allow both users and admins to submit borrow requests
 
 // Handle new borrow request submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
@@ -328,7 +324,13 @@ $user_requests_result = $user_requests_stmt->get_result();
     </style>
 </head>
 <body style="display: block;">
-    <a href="logout.php" class="logout-btn">Logout</a>
+    <div style="position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000;">
+        <?php if ($member_data['role'] === 'admin'): ?>
+            <a href="admin_page.php" class="logout-btn" style="background: #9b59b6;">🔧 Admin Panel</a>
+        <?php endif; ?>
+        <a href="user_dashboard.php" class="logout-btn" style="background: #3498db;">📚 Dashboard</a>
+        <a href="logout.php" class="logout-btn">🚪 Logout</a>
+    </div>
     
     <div class="main-content">
         <div class="welcome-section">

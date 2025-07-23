@@ -24,11 +24,7 @@ $member_result = $member_query->get_result();
 $member_data = $member_result->fetch_assoc();
 $member_id = $member_data['member_id'] ?? 0;
 
-// Redirect admin users to admin dashboard
-if ($member_data['role'] === 'admin') {
-    header('Location: admin_page.php');
-    exit;
-}
+// Allow both users and admins to access user dashboard
 
 // Handle wishlist actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_wishlist'])) {
@@ -524,6 +520,9 @@ $pending_fines_amount = $pending_fines->get_result()->fetch_assoc()['total'];
             <p>Explore our library collection and manage your borrowed books</p>
         </div>
         <div class="header-actions">
+            <?php if ($member_data['role'] === 'admin'): ?>
+                <a href="admin_page.php" class="borrow-request-btn" style="background: #9b59b6;">🔧 Admin Panel</a>
+            <?php endif; ?>
             <a href="borrow_request.php" class="borrow-request-btn">📚 Borrow Request</a>
             <a href="logout.php" class="logout-btn">🚪 Logout</a>
         </div>
