@@ -118,18 +118,81 @@ long_exit_loss = close < ema21 or macd_line < signal_line or rsi < 30
 short_exit_profit = rsi < rsi_oversold or close < bb_lower or williams_r < -80 or close > sar
 short_exit_loss = close > ema21 or macd_line > signal_line or rsi > 70
 
+// Stop Loss Types
+sl_type = input.string("ATR", title="Stop Loss Type", options=["ATR", "Percentage", "EMA", "Support/Resistance", "Trailing"])
+sl_percentage = input.float(2.0, title="Stop Loss Percentage", minval=0.1, maxval=10.0)
+trailing_sl_activation = input.float(1.0, title="Trailing SL Activation (ATR)", minval=0.1)
+use_breakeven = input.bool(true, title="Move to Breakeven")
+breakeven_trigger = input.float(1.5, title="Breakeven Trigger (ATR)", minval=0.5)
+
+// Dynamic Stop Loss Calculation
+var float long_sl = na
+var float short_sl = na
+var float long_entry_price = na
+var float short_entry_price = na
+
+// Calculate Stop Loss based on type
+calculate_long_sl(entry_price) =>
+    switch sl_type
+        "ATR" => entry_price - (atr * atr_mult)
+        "Percentage" => entry_price * (1 - sl_percentage / 100)
+        "EMA" => math.min(ema21, sma50)
+        "Support/Resistance" => ta.valuewhen(pivot_low, low, 0) * 0.995
+        "Trailing" => entry_price - (atr * atr_mult)
+        => entry_price - (atr * atr_mult)
+
+calculate_short_sl(entry_price) =>
+    switch sl_type
+        "ATR" => entry_price + (atr * atr_mult)
+        "Percentage" => entry_price * (1 + sl_percentage / 100)
+        "EMA" => math.max(ema21, sma50)
+        "Support/Resistance" => ta.valuewhen(pivot_high, high, 0) * 1.005
+        "Trailing" => entry_price + (atr * atr_mult)
+        => entry_price + (atr * atr_mult)
+
+// Trailing Stop Loss Logic
+update_trailing_sl() =>
+    if strategy.position_size > 0 and sl_type == "Trailing"
+        new_sl = close - (atr * atr_mult)
+        long_sl := math.max(long_sl, new_sl)
+    else if strategy.position_size < 0 and sl_type == "Trailing"
+        new_sl = close + (atr * atr_mult)
+        short_sl := math.min(short_sl, new_sl)
+
+// Breakeven Logic
+move_to_breakeven() =>
+    if use_breakeven and strategy.position_size > 0
+        if close >= long_entry_price + (atr * breakeven_trigger)
+            long_sl := long_entry_price + (atr * 0.1) // Small profit
+    else if use_breakeven and strategy.position_size < 0
+        if close <= short_entry_price - (atr * breakeven_trigger)
+            short_sl := short_entry_price - (atr * 0.1) // Small profit
+
 // Strategy Execution
 if long_entry and strategy.position_size == 0
-    stop_loss = close - (atr * atr_mult)
+    long_entry_price := close
+    long_sl := calculate_long_sl(close)
     take_profit = close + (atr * atr_mult * risk_reward_ratio)
     strategy.entry("Long", strategy.long)
-    strategy.exit("Long Exit", "Long", stop=stop_loss, limit=take_profit)
+    strategy.exit("Long Exit", "Long", stop=long_sl, limit=take_profit)
 
 if short_entry and strategy.position_size == 0
-    stop_loss = close + (atr * atr_mult)
+    short_entry_price := close
+    short_sl := calculate_short_sl(close)
     take_profit = close - (atr * atr_mult * risk_reward_ratio)
     strategy.entry("Short", strategy.short)
-    strategy.exit("Short Exit", "Short", stop=stop_loss, limit=take_profit)
+    strategy.exit("Short Exit", "Short", stop=short_sl, limit=take_profit)
+
+// Update stops during position
+if strategy.position_size != 0
+    update_trailing_sl()
+    move_to_breakeven()
+
+// Apply updated stops
+if strategy.position_size > 0 and sl_type == "Trailing"
+    strategy.exit("Long Trail", "Long", stop=long_sl)
+if strategy.position_size < 0 and sl_type == "Trailing"
+    strategy.exit("Short Trail", "Short", stop=short_sl)
 
 // Additional exit conditions
 if strategy.position_size > 0 and long_exit_profit
@@ -159,11 +222,17 @@ plot(sar, color=close > sar ? color.green : color.red, style=plot.style_cross, l
 plotshape(long_entry, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.normal, title="Long Entry")
 plotshape(short_entry, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.normal, title="Short Entry")
 
+// Stop Loss Lines
+plot(strategy.position_size > 0 ? long_sl : na, color=color.red, style=plot.style_linebr, linewidth=2, title="Long Stop Loss")
+plot(strategy.position_size < 0 ? short_sl : na, color=color.red, style=plot.style_linebr, linewidth=2, title="Short Stop Loss")
+plot(strategy.position_size > 0 ? long_entry_price : na, color=color.blue, style=plot.style_linebr, linewidth=1, title="Long Entry Price")
+plot(strategy.position_size < 0 ? short_entry_price : na, color=color.blue, style=plot.style_linebr, linewidth=1, title="Short Entry Price")
+
 // Background color for trend
 bgcolor(uptrend ? color.new(color.green, 95) : downtrend ? color.new(color.red, 95) : na)
 
 // Display information table
-var table info_table = table.new(position.top_right, 2, 10, bgcolor=color.white, border_width=1)
+var table info_table = table.new(position.top_right, 2, 13, bgcolor=color.white, border_width=1)
 
 if barstate.islast
     table.cell(info_table, 0, 0, "RSI", text_color=color.black)
@@ -197,8 +266,19 @@ if barstate.islast
     table.cell(info_table, 1, 8, str.tostring(math.round(strategy.wintrades/strategy.closedtrades*100, 1)) + "%",
                text_color=color.black)
     
-    table.cell(info_table, 0, 9, "Total Trades", text_color=color.black)
-    table.cell(info_table, 1, 9, str.tostring(strategy.closedtrades), text_color=color.black)
+    table.cell(info_table, 0, 9, "SL Type", text_color=color.black)
+    table.cell(info_table, 1, 9, sl_type, text_color=color.black)
+    
+    table.cell(info_table, 0, 10, "Current SL", text_color=color.black)
+    current_sl = strategy.position_size > 0 ? long_sl : strategy.position_size < 0 ? short_sl : na
+    table.cell(info_table, 1, 10, not na(current_sl) ? str.tostring(math.round(current_sl, 2)) : "N/A", text_color=color.red)
+    
+    table.cell(info_table, 0, 11, "Risk %", text_color=color.black)
+    risk_pct = strategy.position_size != 0 and not na(current_sl) ? math.abs((close - current_sl) / close * 100) : na
+    table.cell(info_table, 1, 11, not na(risk_pct) ? str.tostring(math.round(risk_pct, 2)) + "%" : "N/A", text_color=color.orange)
+    
+    table.cell(info_table, 0, 12, "Total Trades", text_color=color.black)
+    table.cell(info_table, 1, 12, str.tostring(strategy.closedtrades), text_color=color.black)
 
 // Alerts
 alertcondition(long_entry, title="Long Entry Signal", message="NIFTY 50 Long Entry - All conditions met")

@@ -150,20 +150,127 @@ long_exit_sl = close < ema_s or ta.crossunder(macd_line, signal_line) or rsi < 2
 short_exit_tp = rsi < rsi_os or close < bb_lower or mfi < mfi_os or williams_r < -80
 short_exit_sl = close > ema_s or ta.crossover(macd_line, signal_line) or rsi > 75 or close > sar
 
+// ==================== ADVANCED STOP LOSS SYSTEM ====================
+// Stop Loss Configuration
+sl_method = input.string("Smart ATR", title="Stop Loss Method", options=["Smart ATR", "Percentage", "EMA Support", "Pivot Levels", "Volatility Based", "Trailing"])
+sl_percent = input.float(1.8, title="Percentage Stop Loss (%)", minval=0.1, maxval=5.0)
+use_trailing_stop = input.bool(true, title="Enable Trailing Stop")
+trailing_start = input.float(1.2, title="Trailing Start (ATR)", minval=0.5)
+trailing_step = input.float(0.5, title="Trailing Step (ATR)", minval=0.1)
+use_breakeven_stop = input.bool(true, title="Move to Breakeven")
+breakeven_trigger = input.float(2.0, title="Breakeven Trigger (ATR)", minval=1.0)
+max_sl_distance = input.float(4.0, title="Maximum SL Distance (ATR)", minval=2.0)
+
+// Advanced Stop Loss Variables
+var float long_stop_loss = na
+var float short_stop_loss = na
+var float long_entry_price = na
+var float short_entry_price = na
+var float highest_profit_long = na
+var float lowest_profit_short = na
+var bool breakeven_moved_long = false
+var bool breakeven_moved_short = false
+
+// Volatility-based stop calculation
+volatility_factor = ta.stdev(ta.change(close), 20) / close * 100
+volatility_multiplier = volatility_factor > 2 ? 1.5 : volatility_factor > 1 ? 1.2 : 1.0
+
+// Smart ATR calculation with volatility adjustment
+smart_atr = atr * volatility_multiplier
+
+// Calculate Stop Loss based on method
+calculate_long_stop(entry_price) =>
+    base_stop = switch sl_method
+        "Smart ATR" => entry_price - (smart_atr * sl_multiplier)
+        "Percentage" => entry_price * (1 - sl_percent / 100)
+        "EMA Support" => math.min(ema_s, sma_filter_line) * 0.998
+        "Pivot Levels" => ta.valuewhen(pivot_low, low, 0) * 0.995
+        "Volatility Based" => entry_price - (atr * sl_multiplier * volatility_multiplier)
+        "Trailing" => entry_price - (smart_atr * sl_multiplier)
+        => entry_price - (smart_atr * sl_multiplier)
+    
+    // Ensure stop loss is not too far
+    math.max(base_stop, entry_price - (atr * max_sl_distance))
+
+calculate_short_stop(entry_price) =>
+    base_stop = switch sl_method
+        "Smart ATR" => entry_price + (smart_atr * sl_multiplier)
+        "Percentage" => entry_price * (1 + sl_percent / 100)
+        "EMA Support" => math.max(ema_s, sma_filter_line) * 1.002
+        "Pivot Levels" => ta.valuewhen(pivot_high, high, 0) * 1.005
+        "Volatility Based" => entry_price + (atr * sl_multiplier * volatility_multiplier)
+        "Trailing" => entry_price + (smart_atr * sl_multiplier)
+        => entry_price + (smart_atr * sl_multiplier)
+    
+    // Ensure stop loss is not too far
+    math.min(base_stop, entry_price + (atr * max_sl_distance))
+
+// Advanced Trailing Stop Logic
+update_trailing_stops() =>
+    if strategy.position_size > 0 and use_trailing_stop
+        current_profit = close - long_entry_price
+        if na(highest_profit_long) or current_profit > highest_profit_long
+            highest_profit_long := current_profit
+        
+        if highest_profit_long >= (atr * trailing_start)
+            new_trailing_stop = close - (atr * trailing_step)
+            if na(long_stop_loss) or new_trailing_stop > long_stop_loss
+                long_stop_loss := new_trailing_stop
+    
+    if strategy.position_size < 0 and use_trailing_stop
+        current_profit = short_entry_price - close
+        if na(lowest_profit_short) or current_profit > lowest_profit_short
+            lowest_profit_short := current_profit
+        
+        if lowest_profit_short >= (atr * trailing_start)
+            new_trailing_stop = close + (atr * trailing_step)
+            if na(short_stop_loss) or new_trailing_stop < short_stop_loss
+                short_stop_loss := new_trailing_stop
+
+// Breakeven Logic
+move_to_breakeven() =>
+    if use_breakeven_stop and strategy.position_size > 0 and not breakeven_moved_long
+        if close >= long_entry_price + (atr * breakeven_trigger)
+            long_stop_loss := long_entry_price + (atr * 0.1)
+            breakeven_moved_long := true
+    
+    if use_breakeven_stop and strategy.position_size < 0 and not breakeven_moved_short
+        if close <= short_entry_price - (atr * breakeven_trigger)
+            short_stop_loss := short_entry_price - (atr * 0.1)
+            breakeven_moved_short := true
+
 // ==================== STRATEGY EXECUTION ====================
 // Long trades
 if long_entry and strategy.position_size == 0
-    stop_loss_long = close - (atr * sl_multiplier)
+    long_entry_price := close
+    long_stop_loss := calculate_long_stop(close)
     take_profit_long = close + (atr * tp_multiplier)
+    highest_profit_long := na
+    breakeven_moved_long := false
     strategy.entry("Long", strategy.long, comment="Long Entry")
-    strategy.exit("Long TP/SL", "Long", stop=stop_loss_long, limit=take_profit_long)
+    strategy.exit("Long TP/SL", "Long", stop=long_stop_loss, limit=take_profit_long)
 
 // Short trades
 if short_entry and strategy.position_size == 0
-    stop_loss_short = close + (atr * sl_multiplier)
+    short_entry_price := close
+    short_stop_loss := calculate_short_stop(close)
     take_profit_short = close - (atr * tp_multiplier)
+    lowest_profit_short := na
+    breakeven_moved_short := false
     strategy.entry("Short", strategy.short, comment="Short Entry")
-    strategy.exit("Short TP/SL", "Short", stop=stop_loss_short, limit=take_profit_short)
+    strategy.exit("Short TP/SL", "Short", stop=short_stop_loss, limit=take_profit_short)
+
+// Update stops during open positions
+if strategy.position_size != 0
+    update_trailing_stops()
+    move_to_breakeven()
+
+// Apply updated stops for trailing
+if strategy.position_size > 0 and (sl_method == "Trailing" or use_trailing_stop)
+    strategy.exit("Long Trail", "Long", stop=long_stop_loss)
+
+if strategy.position_size < 0 and (sl_method == "Trailing" or use_trailing_stop)
+    strategy.exit("Short Trail", "Short", stop=short_stop_loss)
 
 // Manual exits
 if strategy.position_size > 0 and long_exit_tp
@@ -194,6 +301,16 @@ plot(sar, color=close > sar ? color.lime : color.red, style=plot.style_circles, 
 plotshape(long_entry, style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.normal, title="Long Signal")
 plotshape(short_entry, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.normal, title="Short Signal")
 
+// Stop Loss and Entry Price Lines
+plot(strategy.position_size > 0 ? long_stop_loss : na, color=color.red, style=plot.style_stepline, linewidth=2, title="Long Stop Loss")
+plot(strategy.position_size < 0 ? short_stop_loss : na, color=color.red, style=plot.style_stepline, linewidth=2, title="Short Stop Loss")
+plot(strategy.position_size > 0 ? long_entry_price : na, color=color.blue, style=plot.style_linebr, linewidth=1, title="Long Entry")
+plot(strategy.position_size < 0 ? short_entry_price : na, color=color.blue, style=plot.style_linebr, linewidth=1, title="Short Entry")
+
+// Take Profit Lines
+plot(strategy.position_size > 0 ? long_entry_price + (atr * tp_multiplier) : na, color=color.green, style=plot.style_linebr, linewidth=1, title="Long TP")
+plot(strategy.position_size < 0 ? short_entry_price - (atr * tp_multiplier) : na, color=color.green, style=plot.style_linebr, linewidth=1, title="Short TP")
+
 // Divergences
 plotshape(bullish_div, style=shape.labelup, location=location.belowbar, color=color.green, text="Bull Div", textcolor=color.white, size=size.small)
 plotshape(bearish_div, style=shape.labeldown, location=location.abovebar, color=color.red, text="Bear Div", textcolor=color.white, size=size.small)
@@ -202,7 +319,7 @@ plotshape(bearish_div, style=shape.labeldown, location=location.abovebar, color=
 bgcolor(strong_uptrend ? color.new(color.green, 97) : strong_downtrend ? color.new(color.red, 97) : color.new(color.yellow, 98))
 
 // ==================== INFORMATION PANEL ====================
-var table info_panel = table.new(position.top_right, 2, 12, bgcolor=color.white, border_width=1)
+var table info_panel = table.new(position.top_right, 2, 15, bgcolor=color.white, border_width=1)
 
 if barstate.islast
     table.cell(info_panel, 0, 0, "Indicator", bgcolor=color.gray, text_color=color.white)
@@ -244,8 +361,19 @@ if barstate.islast
     table.cell(info_panel, 0, 10, "Trades", text_color=color.black)
     table.cell(info_panel, 1, 10, str.tostring(strategy.closedtrades), text_color=color.black)
     
-    table.cell(info_panel, 0, 11, "Drawdown", text_color=color.black)
-    table.cell(info_panel, 1, 11, str.tostring(math.round(strategy.max_drawdown, 2)), text_color=color.red)
+    table.cell(info_panel, 0, 11, "SL Method", text_color=color.black)
+    table.cell(info_panel, 1, 11, sl_method, text_color=color.black)
+    
+    table.cell(info_panel, 0, 12, "Current SL", text_color=color.black)
+    current_stop = strategy.position_size > 0 ? long_stop_loss : strategy.position_size < 0 ? short_stop_loss : na
+    table.cell(info_panel, 1, 12, not na(current_stop) ? str.tostring(math.round(current_stop, 2)) : "N/A", text_color=color.red)
+    
+    table.cell(info_panel, 0, 13, "Risk %", text_color=color.black)
+    current_risk = strategy.position_size != 0 and not na(current_stop) ? math.abs((close - current_stop) / close * 100) : na
+    table.cell(info_panel, 1, 13, not na(current_risk) ? str.tostring(math.round(current_risk, 2)) + "%" : "N/A", text_color=color.orange)
+    
+    table.cell(info_panel, 0, 14, "Drawdown", text_color=color.black)
+    table.cell(info_panel, 1, 14, str.tostring(math.round(strategy.max_drawdown, 2)), text_color=color.red)
 
 // ==================== ALERTS ====================
 alertcondition(long_entry, title="NIFTY Long Entry", message="NIFTY 50 Long Entry Signal - Multiple confirmations")
