@@ -161,3 +161,18 @@ th {
 .report-section:last-of-type {
   margin-bottom: 60px;
 }
+.timeframe-form {
+  margin-bottom: 15px;
+}
+.timeframe-form select {
+  padding: 6px 10px;
+  font-size: 14px;
+}
+.summary-cards {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.summary-cards .card {
+  flex: 0 1 200px;
+}

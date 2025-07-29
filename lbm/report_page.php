@@ -7,6 +7,33 @@ if (!isset($_SESSION['mob_no'])) {
 
 require_once 'configure.php';
 
+// +++ TIMEFRAME FILTER LOGIC +++
+$timeframe = $_GET['tf'] ?? 'daily';
+switch ($timeframe) {
+  case 'weekly':
+    $startDate = date('Y-m-d', strtotime('-7 days'));
+    break;
+  case 'monthly':
+    $startDate = date('Y-m-d', strtotime('-30 days'));
+    break;
+  default:
+    $timeframe = 'daily';
+    $startDate = date('Y-m-d');
+}
+
+// Summary counts based on timeframe
+$borrowSummary = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS cnt FROM issued_books WHERE issue_date >= '$startDate'"));
+$fineSummary = mysqli_fetch_assoc(mysqli_query($conn, "SELECT IFNULL(SUM(fine_amount),0) AS total FROM fines WHERE status='Paid' AND payment_date >= '$startDate'"));
+
+// Query to fetch all issued books
+$allIssuedQuery = "SELECT ib.issue_id, b.title, CONCAT(m.first_name,' ',m.last_name) AS member_name, ib.issue_date, ib.due_date, ib.return_date
+                   FROM issued_books ib
+                   JOIN book_db b ON ib.book_id = b.book_id
+                   JOIN member_db m ON ib.member_id = m.member_id
+                   ORDER BY ib.issue_date DESC";
+$allIssuedResult = mysqli_query($conn, $allIssuedQuery);
+// +++ END TIMEFRAME +++
+
 // ----------------------
 // 1. Top Borrowed Books
 // ----------------------
@@ -110,6 +137,23 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
 
   <main class="main-content">
     <h1>Reports</h1>
+
+    <!-- Timeframe Filter & Summary -->
+    <section class="report-section">
+      <form method="get" class="timeframe-form">
+        <label for="tf">Timeframe: </label>
+        <select name="tf" id="tf" onchange="this.form.submit()">
+          <option value="daily" <?= $timeframe=='daily'?'selected':'' ?>>Daily</option>
+          <option value="weekly" <?= $timeframe=='weekly'?'selected':'' ?>>Weekly</option>
+          <option value="monthly" <?= $timeframe=='monthly'?'selected':'' ?>>Monthly</option>
+        </select>
+      </form>
+
+      <div class="summary-cards">
+        <div class="card"><h2><?= $borrowSummary['cnt'] ?></h2><p>Total Borrows (<?= ucfirst($timeframe) ?>)</p></div>
+        <div class="card"><h2><?= number_format($fineSummary['total'],2) ?></h2><p>Fines Collected (₹)</p></div>
+      </div>
+    </section>
 
     <!-- Top Borrowed Books -->
     <section class="report-section">
@@ -305,6 +349,35 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
             <?php endwhile; ?>
           <?php else: ?>
             <tr><td colspan="3">No data available.</td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- All Issued Books -->
+    <section class="report-section">
+      <h2>All Issued Books</h2>
+      <table border="1" cellpadding="10" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Issue ID</th><th>Book Title</th><th>Member Name</th><th>Issue Date</th><th>Due Date</th><th>Return Date</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (mysqli_num_rows($allIssuedResult) > 0): ?>
+            <?php while ($row = mysqli_fetch_assoc($allIssuedResult)): ?>
+              <tr>
+                <td><?= $row['issue_id'] ?></td>
+                <td><?= htmlspecialchars($row['title']) ?></td>
+                <td><?= htmlspecialchars($row['member_name']) ?></td>
+                <td><?= $row['issue_date'] ?></td>
+                <td><?= $row['due_date'] ?></td>
+                <td><?= $row['return_date'] ?? '—' ?></td>
+                <td><?= $row['return_date'] ? 'Returned' : 'Not Returned' ?></td>
+              </tr>
+            <?php endwhile; ?>
+          <?php else: ?>
+            <tr><td colspan="7">No issued records found.</td></tr>
           <?php endif; ?>
         </tbody>
       </table>
