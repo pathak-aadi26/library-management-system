@@ -148,3 +148,13 @@ th {
   margin-bottom: 15px;
   font-size: 24px;
 }
+
+/* Report sections */
+.report-section {
+  margin-top: 40px;
+}
+
+.report-section h2 {
+  margin-bottom: 15px;
+  font-size: 24px;
+}

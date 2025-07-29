@@ -55,6 +55,7 @@ $recentIssues = mysqli_query(
       <a href="manage_issue.php">Issued Details</a>
       <a href="#">Borrow Requests</a>
               <a href="fine_details.php">Fine Details</a>
+      <a href="report_page.php">Reports</a>
       <a href="#">Returns</a>
       <a href="#">More</a>
     </nav>
