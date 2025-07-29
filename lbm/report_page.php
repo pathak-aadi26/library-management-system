@@ -47,6 +47,41 @@ $overdueResult = mysqli_query($conn, $overdueQuery);
 // ----------------------
 $lowStockQuery = "SELECT book_id, title, total_stock FROM book_db WHERE total_stock < 3 ORDER BY total_stock ASC";
 $lowStockResult = mysqli_query($conn, $lowStockQuery);
+
+// +++ NEW REPORT QUERIES +++
+// 5. Monthly Borrowing Trend (last 12 months)
+$monthlyBorrowQuery = "SELECT DATE_FORMAT(issue_date,'%Y-%m') AS month, COUNT(*) AS borrow_count
+                       FROM issued_books
+                       GROUP BY month
+                       ORDER BY month DESC
+                       LIMIT 12";
+$monthlyBorrowResult = mysqli_query($conn, $monthlyBorrowQuery);
+
+// 6. Category Popularity
+$categoryPopularQuery = "SELECT b.category, COUNT(*) AS borrow_count
+                          FROM issued_books ib
+                          JOIN book_db b ON ib.book_id = b.book_id
+                          GROUP BY b.category
+                          ORDER BY borrow_count DESC";
+$categoryPopularResult = mysqli_query($conn, $categoryPopularQuery);
+
+// 7. Fine Collection Summary (last 12 months)
+$fineCollectionQuery = "SELECT DATE_FORMAT(payment_date,'%Y-%m') AS month, SUM(fine_amount) AS total_collected
+                        FROM fines WHERE status='Paid'
+                        GROUP BY month
+                        ORDER BY month DESC
+                        LIMIT 12";
+$fineCollectionResult = mysqli_query($conn, $fineCollectionQuery);
+
+// 8. Top Authors
+$topAuthorsQuery = "SELECT b.author_name, COUNT(*) AS borrow_count
+                    FROM issued_books ib
+                    JOIN book_db b ON ib.book_id = b.book_id
+                    GROUP BY b.author_name
+                    ORDER BY borrow_count DESC
+                    LIMIT 10";
+$topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
+// +++ END NEW QUERIES +++
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -177,6 +212,105 @@ $lowStockResult = mysqli_query($conn, $lowStockQuery);
         </tbody>
       </table>
     </section>
+
+    <!-- Monthly Borrowing Trend -->
+    <section class="report-section">
+      <h2>Monthly Borrowing Trend (Last 12 Months)</h2>
+      <table border="1" cellpadding="10" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Month</th><th>Total Borrows</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (mysqli_num_rows($monthlyBorrowResult) > 0): ?>
+            <?php while ($row = mysqli_fetch_assoc($monthlyBorrowResult)): ?>
+              <tr>
+                <td><?= $row['month'] ?></td>
+                <td><?= $row['borrow_count'] ?></td>
+              </tr>
+            <?php endwhile; ?>
+          <?php else: ?>
+            <tr><td colspan="2">No borrowing data available.</td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Category Popularity -->
+    <section class="report-section">
+      <h2>Category Popularity</h2>
+      <table border="1" cellpadding="10" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Category</th><th>Total Borrows</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (mysqli_num_rows($categoryPopularResult) > 0): ?>
+            <?php while ($row = mysqli_fetch_assoc($categoryPopularResult)): ?>
+              <tr>
+                <td><?= htmlspecialchars($row['category'] ?: 'Uncategorized') ?></td>
+                <td><?= $row['borrow_count'] ?></td>
+              </tr>
+            <?php endwhile; ?>
+          <?php else: ?>
+            <tr><td colspan="2">No data available.</td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Fine Collection Summary -->
+    <section class="report-section">
+      <h2>Fine Collection Summary (Last 12 Months)</h2>
+      <table border="1" cellpadding="10" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Month</th><th>Total Collected (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php if (mysqli_num_rows($fineCollectionResult) > 0): ?>
+            <?php while ($row = mysqli_fetch_assoc($fineCollectionResult)): ?>
+              <tr>
+                <td><?= $row['month'] ?></td>
+                <td><?= number_format($row['total_collected'], 2) ?></td>
+              </tr>
+            <?php endwhile; ?>
+          <?php else: ?>
+            <tr><td colspan="2">No fine collection data.</td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Top Authors -->
+    <section class="report-section">
+      <h2>Top Authors by Borrow Count</h2>
+      <table border="1" cellpadding="10" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Rank</th><th>Author</th><th>Total Borrows</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php $rank = 1; if (mysqli_num_rows($topAuthorsResult) > 0): ?>
+            <?php while ($row = mysqli_fetch_assoc($topAuthorsResult)): ?>
+              <tr>
+                <td><?= $rank++ ?></td>
+                <td><?= htmlspecialchars($row['author_name']) ?></td>
+                <td><?= $row['borrow_count'] ?></td>
+              </tr>
+            <?php endwhile; ?>
+          <?php else: ?>
+            <tr><td colspan="3">No data available.</td></tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- END NEW REPORTS -->
 
   </main>
 </body>

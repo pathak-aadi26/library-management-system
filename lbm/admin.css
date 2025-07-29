@@ -158,3 +158,6 @@ th {
   margin-bottom: 15px;
   font-size: 24px;
 }
+.report-section:last-of-type {
+  margin-bottom: 60px;
+}
