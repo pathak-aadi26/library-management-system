@@ -153,10 +153,24 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
         <div class="card"><h2><?= $borrowSummary['cnt'] ?></h2><p>Total Borrows (<?= ucfirst($timeframe) ?>)</p></div>
         <div class="card"><h2><?= number_format($fineSummary['total'],2) ?></h2><p>Fines Collected (₹)</p></div>
       </div>
+
+      <!-- Report selector -->
+      <label for="reportSelector" style="margin-top:20px; display:inline-block;">Select Report:</label>
+      <select id="reportSelector" onchange="showReport()" style="padding:6px 10px; margin-left:10px;">
+        <option value="topBooks">Top Borrowed Books</option>
+        <option value="activeMembers">Active Members</option>
+        <option value="overdue">Overdue Books</option>
+        <option value="lowStock">Low Stock Books</option>
+        <option value="monthlyTrend">Monthly Borrowing Trend</option>
+        <option value="categoryPopularity">Category Popularity</option>
+        <option value="fineSummary">Fine Collection Summary</option>
+        <option value="topAuthors">Top Authors</option>
+        <option value="allIssued">All Issued Books</option>
+      </select>
     </section>
 
     <!-- Top Borrowed Books -->
-    <section class="report-section">
+    <section class="report-section rp" id="topBooks">
       <h2>Top Borrowed Books</h2>
       <table border="1" cellpadding="10" cellspacing="0">
         <thead>
@@ -182,7 +196,7 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
     </section>
 
     <!-- Active Members -->
-    <section class="report-section">
+    <section class="report-section rp" id="activeMembers" style="display:none;">
       <h2>Members With Most Borrows</h2>
       <table border="1" cellpadding="10" cellspacing="0">
         <thead>
@@ -207,7 +221,7 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
     </section>
 
     <!-- Overdue Books -->
-    <section class="report-section">
+    <section class="report-section rp" id="overdue" style="display:none;">
       <h2>Currently Overdue Books</h2>
       <table border="1" cellpadding="10" cellspacing="0">
         <thead>
@@ -233,7 +247,7 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
     </section>
 
     <!-- Low Stock Books -->
-    <section class="report-section">
+    <section class="report-section rp" id="lowStock" style="display:none;">
       <h2>Low Stock Books (Less than 3)</h2>
       <table border="1" cellpadding="10" cellspacing="0">
         <thead>
@@ -258,7 +272,7 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
     </section>
 
     <!-- Monthly Borrowing Trend -->
-    <section class="report-section">
+    <section class="report-section rp" id="monthlyTrend" style="display:none;">
       <h2>Monthly Borrowing Trend (Last 12 Months)</h2>
       <table border="1" cellpadding="10" cellspacing="0">
         <thead>
@@ -282,7 +296,7 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
     </section>
 
     <!-- Category Popularity -->
-    <section class="report-section">
+    <section class="report-section rp" id="categoryPopularity" style="display:none;">
       <h2>Category Popularity</h2>
       <table border="1" cellpadding="10" cellspacing="0">
         <thead>
@@ -306,7 +320,7 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
     </section>
 
     <!-- Fine Collection Summary -->
-    <section class="report-section">
+    <section class="report-section rp" id="fineSummary" style="display:none;">
       <h2>Fine Collection Summary (Last 12 Months)</h2>
       <table border="1" cellpadding="10" cellspacing="0">
         <thead>
@@ -330,7 +344,7 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
     </section>
 
     <!-- Top Authors -->
-    <section class="report-section">
+    <section class="report-section rp" id="topAuthors" style="display:none;">
       <h2>Top Authors by Borrow Count</h2>
       <table border="1" cellpadding="10" cellspacing="0">
         <thead>
@@ -355,7 +369,7 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
     </section>
 
     <!-- All Issued Books -->
-    <section class="report-section">
+    <section class="report-section rp" id="allIssued" style="display:none;">
       <h2>All Issued Books</h2>
       <table border="1" cellpadding="10" cellspacing="0">
         <thead>
@@ -386,5 +400,15 @@ $topAuthorsResult = mysqli_query($conn, $topAuthorsQuery);
     <!-- END NEW REPORTS -->
 
   </main>
+  <script>
+    function showReport(){
+      const v=document.getElementById('reportSelector').value;
+      document.querySelectorAll('.rp').forEach(s=>{
+        s.style.display = (s.id===v)?'block':'none';
+      });
+    }
+    // initialise on load
+    document.addEventListener('DOMContentLoaded',showReport);
+  </script>
 </body>
 </html>
