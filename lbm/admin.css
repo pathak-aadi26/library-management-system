@@ -138,3 +138,41 @@ th, td {
 th {
     background-color: #f2f2f2;
 }
+
+/* Recent activity */
+.recent {
+  margin-top: 40px;
+}
+
+.recent h2 {
+  margin-bottom: 15px;
+  font-size: 24px;
+}
+
+/* Report sections */
+.report-section {
+  margin-top: 40px;
+}
+
+.report-section h2 {
+  margin-bottom: 15px;
+  font-size: 24px;
+}
+.report-section:last-of-type {
+  margin-bottom: 60px;
+}
+.timeframe-form {
+  margin-bottom: 15px;
+}
+.timeframe-form select {
+  padding: 6px 10px;
+  font-size: 14px;
+}
+.summary-cards {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.summary-cards .card {
+  flex: 0 1 200px;
+}
