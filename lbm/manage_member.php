@@ -82,15 +82,15 @@ if (isset($_GET['delete'])) {
 <aside class="sidebar">
     <h2>Library Admin</h2>
     <nav>
-        <a href="admin_page.php">Dashboard</a>
+         <a href="admin_page.php">Dashboard</a>
         <a href="manage_member.php">Manage Member</a>
         <a href="manage_book.php">Manage Books</a>
+        <a href="wishlist_data.php">Book Issue</a>
+        <!-- <a href="manage_borrow.php">Borrow Requests</a> -->
+        <a href="manage_fine.php">Fine Details</a>
         <a href="manage_issue.php">Issued Details</a>
-        <a href="#">Borrow Requests</a>
-        <a href="fine_details.php">Fine Details</a>
-        <a href="#">Returns</a>
-        <a href="#">More</a>
-        
+        <a href="manage_return.php">Returns</a>
+        <a href="report_page.php">Reports</a>
     </nav>
     <button class="logout-btn" onclick="location.href='logout.php'">Logout</button>
 </aside>
@@ -119,7 +119,8 @@ if (isset($_GET['delete'])) {
     </form>
 
     <h2>All Members</h2>
-    <table border="1" cellpadding="10" cellspacing="0">
+    <div class="table-container">
+    <table>
         <thead>
         <tr>
             <th>ID</th><th>First</th><th>Last</th><th>Address</th><th>Mobile</th><th>Email</th><th>Role</th><th>Actions</th>
@@ -143,6 +144,7 @@ if (isset($_GET['delete'])) {
         <?php endwhile; ?>
         </tbody>
     </table>
+        </div>
 </main>
 </body>
 </html>

@@ -41,7 +41,7 @@ if (isset($_POST['login'])) {
                 header("Location: admin_page.php");
             }
             else{
-                header("Location: dashboard.php");
+                header("Location: user_dashboard.php");
             }
             
             exit();
