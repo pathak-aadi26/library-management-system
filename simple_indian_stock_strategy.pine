@@ -1,0 +1,233 @@
+//@version=5
+strategy("Simple Indian Stock Strategy - 15min", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// =============== INPUT PARAMETERS ===============
+// Moving Averages
+ema_fast = input.int(9, title="Fast EMA", minval=1)
+ema_slow = input.int(21, title="Slow EMA", minval=1)
+sma_trend = input.int(50, title="Trend SMA", minval=1)
+
+// RSI Settings
+rsi_length = input.int(14, title="RSI Length", minval=1)
+rsi_ob = input.int(70, title="RSI Overbought", minval=50, maxval=100)
+rsi_os = input.int(30, title="RSI Oversold", minval=0, maxval=50)
+
+// Volume Settings
+vol_length = input.int(20, title="Volume MA Length", minval=1)
+vol_threshold = input.float(1.5, title="Volume Threshold", minval=1.0)
+
+// Stop Loss Settings
+sl_type = input.string("ATR", title="Stop Loss Type", options=["ATR", "Percentage", "Fixed Points"])
+atr_length = input.int(14, title="ATR Length", minval=1)
+sl_atr_mult = input.float(2.0, title="ATR Stop Loss Multiplier", minval=0.5)
+sl_percent = input.float(2.0, title="Stop Loss Percentage", minval=0.1, maxval=10.0)
+sl_points = input.float(10.0, title="Fixed Stop Loss Points", minval=1.0)
+
+// Take Profit Settings
+tp_atr_mult = input.float(3.0, title="ATR Take Profit Multiplier", minval=1.0)
+tp_percent = input.float(4.0, title="Take Profit Percentage", minval=0.5, maxval=20.0)
+tp_points = input.float(20.0, title="Fixed Take Profit Points", minval=1.0)
+
+// Risk Management
+use_trailing_stop = input.bool(true, title="Enable Trailing Stop")
+use_breakeven = input.bool(true, title="Move to Breakeven")
+
+// =============== TECHNICAL INDICATORS ===============
+// Moving Averages (Only 3 lines on chart)
+ema9 = ta.ema(close, ema_fast)
+ema21 = ta.ema(close, ema_slow)
+sma50 = ta.sma(close, sma_trend)
+
+// RSI (not plotted)
+rsi = ta.rsi(close, rsi_length)
+
+// Volume Analysis (not plotted)
+vol_ma = ta.sma(volume, vol_length)
+high_volume = volume > (vol_ma * vol_threshold)
+
+// ATR for stop loss
+atr = ta.atr(atr_length)
+
+// =============== TREND AND SIGNAL LOGIC ===============
+// Simple trend definition
+uptrend = ema9 > ema21 and ema21 > sma50 and close > ema9
+downtrend = ema9 < ema21 and ema21 < sma50 and close < ema9
+
+// Enhanced Buy/Sell Signals
+// BUY Conditions (all must be true)
+buy_signal = uptrend and 
+             ta.crossover(ema9, ema21) and 
+             rsi > 40 and rsi < 80 and 
+             high_volume and 
+             close > open
+
+// SELL Conditions (all must be true)
+sell_signal = downtrend and 
+              ta.crossunder(ema9, ema21) and 
+              rsi < 60 and rsi > 20 and 
+              high_volume and 
+              close < open
+
+// =============== STOP LOSS CALCULATION ===============
+var float long_entry_price = na
+var float short_entry_price = na
+var float long_stop_loss = na
+var float short_stop_loss = na
+var float long_take_profit = na
+var float short_take_profit = na
+
+calculate_long_sl(entry_price) =>
+    switch sl_type
+        "ATR" => entry_price - (atr * sl_atr_mult)
+        "Percentage" => entry_price * (1 - sl_percent / 100)
+        "Fixed Points" => entry_price - sl_points
+        => entry_price - (atr * sl_atr_mult)
+
+calculate_short_sl(entry_price) =>
+    switch sl_type
+        "ATR" => entry_price + (atr * sl_atr_mult)
+        "Percentage" => entry_price * (1 + sl_percent / 100)
+        "Fixed Points" => entry_price + sl_points
+        => entry_price + (atr * sl_atr_mult)
+
+calculate_long_tp(entry_price) =>
+    switch sl_type
+        "ATR" => entry_price + (atr * tp_atr_mult)
+        "Percentage" => entry_price * (1 + tp_percent / 100)
+        "Fixed Points" => entry_price + tp_points
+        => entry_price + (atr * tp_atr_mult)
+
+calculate_short_tp(entry_price) =>
+    switch sl_type
+        "ATR" => entry_price - (atr * tp_atr_mult)
+        "Percentage" => entry_price * (1 - tp_percent / 100)
+        "Fixed Points" => entry_price - tp_points
+        => entry_price - (atr * tp_atr_mult)
+
+// =============== TRAILING STOP LOGIC ===============
+update_trailing_stops() =>
+    if strategy.position_size > 0 and use_trailing_stop
+        new_sl = close - (atr * sl_atr_mult)
+        if new_sl > long_stop_loss
+            long_stop_loss := new_sl
+    
+    if strategy.position_size < 0 and use_trailing_stop
+        new_sl = close + (atr * sl_atr_mult)
+        if new_sl < short_stop_loss
+            short_stop_loss := new_sl
+
+// Breakeven Logic
+move_to_breakeven() =>
+    if use_breakeven and strategy.position_size > 0
+        profit = close - long_entry_price
+        if profit >= (atr * 1.5)
+            long_stop_loss := long_entry_price + (atr * 0.1)
+    
+    if use_breakeven and strategy.position_size < 0
+        profit = short_entry_price - close
+        if profit >= (atr * 1.5)
+            short_stop_loss := short_entry_price - (atr * 0.1)
+
+// =============== STRATEGY EXECUTION ===============
+// Long Entry
+if buy_signal and strategy.position_size == 0
+    long_entry_price := close
+    long_stop_loss := calculate_long_sl(close)
+    long_take_profit := calculate_long_tp(close)
+    strategy.entry("Long", strategy.long, comment="BUY")
+    strategy.exit("Long Exit", "Long", stop=long_stop_loss, limit=long_take_profit)
+
+// Short Entry
+if sell_signal and strategy.position_size == 0
+    short_entry_price := close
+    short_stop_loss := calculate_short_sl(close)
+    short_take_profit := calculate_short_tp(close)
+    strategy.entry("Short", strategy.short, comment="SELL")
+    strategy.exit("Short Exit", "Short", stop=short_stop_loss, limit=short_take_profit)
+
+// Update stops
+if strategy.position_size != 0
+    update_trailing_stops()
+    move_to_breakeven()
+
+// Apply trailing stops
+if strategy.position_size > 0 and use_trailing_stop
+    strategy.exit("Long Trail", "Long", stop=long_stop_loss, limit=long_take_profit)
+
+if strategy.position_size < 0 and use_trailing_stop
+    strategy.exit("Short Trail", "Short", stop=short_stop_loss, limit=short_take_profit)
+
+// Emergency exits
+if strategy.position_size > 0 and (rsi > 85 or close < ema21)
+    strategy.close("Long", comment="Emergency Exit")
+
+if strategy.position_size < 0 and (rsi < 15 or close > ema21)
+    strategy.close("Short", comment="Emergency Exit")
+
+// =============== PLOTTING (ONLY 3 LINES) ===============
+// Line 1: Fast EMA (Blue)
+plot(ema9, color=color.blue, linewidth=2, title="EMA 9")
+
+// Line 2: Slow EMA (Red)
+plot(ema21, color=color.red, linewidth=2, title="EMA 21")
+
+// Line 3: Trend SMA (Yellow)
+plot(sma50, color=color.yellow, linewidth=2, title="SMA 50")
+
+// =============== BUY/SELL SIGNALS ===============
+// Buy Signal (Green Arrow Up)
+plotshape(buy_signal, style=shape.triangleup, location=location.belowbar, 
+          color=color.green, size=size.normal, title="BUY Signal", text="BUY")
+
+// Sell Signal (Red Arrow Down)
+plotshape(sell_signal, style=shape.triangledown, location=location.abovebar, 
+          color=color.red, size=size.normal, title="SELL Signal", text="SELL")
+
+// Current Stop Loss Line (only when in position)
+plot(strategy.position_size > 0 ? long_stop_loss : strategy.position_size < 0 ? short_stop_loss : na, 
+     color=color.red, style=plot.style_linebr, linewidth=1, title="Stop Loss", display=display.none)
+
+// =============== BACKGROUND TREND COLOR ===============
+bgcolor(uptrend ? color.new(color.green, 95) : downtrend ? color.new(color.red, 95) : na)
+
+// =============== INFORMATION TABLE ===============
+var table info_table = table.new(position.top_right, 2, 8, bgcolor=color.white, border_width=1)
+
+if barstate.islast
+    table.cell(info_table, 0, 0, "Signal", bgcolor=color.gray, text_color=color.white)
+    table.cell(info_table, 1, 0, "Status", bgcolor=color.gray, text_color=color.white)
+    
+    table.cell(info_table, 0, 1, "Trend", text_color=color.black)
+    trend_text = uptrend ? "BULLISH" : downtrend ? "BEARISH" : "SIDEWAYS"
+    trend_color = uptrend ? color.green : downtrend ? color.red : color.orange
+    table.cell(info_table, 1, 1, trend_text, text_color=trend_color)
+    
+    table.cell(info_table, 0, 2, "RSI", text_color=color.black)
+    table.cell(info_table, 1, 2, str.tostring(math.round(rsi, 1)), 
+               text_color=rsi > rsi_ob ? color.red : rsi < rsi_os ? color.green : color.black)
+    
+    table.cell(info_table, 0, 3, "Volume", text_color=color.black)
+    table.cell(info_table, 1, 3, high_volume ? "HIGH" : "NORMAL", 
+               text_color=high_volume ? color.green : color.gray)
+    
+    table.cell(info_table, 0, 4, "Position", text_color=color.black)
+    pos_text = strategy.position_size > 0 ? "LONG" : strategy.position_size < 0 ? "SHORT" : "NONE"
+    pos_color = strategy.position_size > 0 ? color.green : strategy.position_size < 0 ? color.red : color.gray
+    table.cell(info_table, 1, 4, pos_text, text_color=pos_color)
+    
+    table.cell(info_table, 0, 5, "P&L", text_color=color.black)
+    table.cell(info_table, 1, 5, str.tostring(math.round(strategy.netprofit, 2)), 
+               text_color=strategy.netprofit > 0 ? color.green : color.red)
+    
+    table.cell(info_table, 0, 6, "Win Rate", text_color=color.black)
+    win_rate = strategy.closedtrades > 0 ? strategy.wintrades / strategy.closedtrades * 100 : 0
+    table.cell(info_table, 1, 6, str.tostring(math.round(win_rate, 1)) + "%", text_color=color.black)
+    
+    table.cell(info_table, 0, 7, "Trades", text_color=color.black)
+    table.cell(info_table, 1, 7, str.tostring(strategy.closedtrades), text_color=color.black)
+
+// =============== ALERTS ===============
+alertcondition(buy_signal, title="BUY Signal", message="{{ticker}} - BUY Signal at {{close}} - RSI: {{rsi}}")
+alertcondition(sell_signal, title="SELL Signal", message="{{ticker}} - SELL Signal at {{close}} - RSI: {{rsi}}")
+alertcondition(strategy.position_size > 0 and close <= long_stop_loss, title="Stop Loss Hit", message="{{ticker}} - Stop Loss Hit")
+alertcondition(strategy.position_size > 0 and close >= long_take_profit, title="Take Profit Hit", message="{{ticker}} - Take Profit Hit")
